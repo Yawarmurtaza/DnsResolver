@@ -29,59 +29,58 @@ namespace DnsClient
 
         public override DnsResponseMessage Query(IPEndPoint server, DnsRequestMessage request, TimeSpan timeout)
         {
-            UdpClient udpClient = GetNextUdpClient(server.AddressFamily);
-
-            // -1 indicates infinite
-            int timeoutInMillis = timeout.TotalMilliseconds >= int.MaxValue ? -1 : (int)timeout.TotalMilliseconds;
-            udpClient.Client.ReceiveTimeout = timeoutInMillis;
-            udpClient.Client.SendTimeout = timeoutInMillis;
-
-            bool mustDispose = false;
-            try
+            using (UdpClient udpClient = GetNextUdpClient(server.AddressFamily))
             {
-                using (var writer = new DnsDatagramWriter())
+                Socket client = udpClient.Client;
+                // -1 indicates infinite
+                int timeoutInMillis = timeout.TotalMilliseconds >= int.MaxValue ? -1 : (int) timeout.TotalMilliseconds;
+                client.ReceiveTimeout = timeoutInMillis;
+                client.SendTimeout = timeoutInMillis;
+
+                bool mustDispose = false;
+                try
                 {
-                    GetRequestData(request, writer);
-
-                    // udpClient is a .net FCL class that allows us to access the underlying socket object.
-                    udpClient.Client.SendTo(writer.Data.Array, writer.Data.Offset, writer.Data.Count, SocketFlags.None, server);
-                }
-
-                var readSize = udpClient.Available > MaxSize ? udpClient.Available : MaxSize;
-
-                using (var memory = new PooledBytes(readSize))
-                {
-                    var received = udpClient.Client.Receive(memory.Buffer, 0, readSize, SocketFlags.None);
-
-                    var response = GetResponseMessage(new ArraySegment<byte>(memory.Buffer, 0, received));
-                    if (request.Header.Id != response.Header.Id)
+                    using (var writer = new DnsDatagramWriter())
                     {
-                        throw new DnsResponseException("Header id mismatch.");
+                        GetRequestData(request, writer);
+
+                        // udpClient is a .net FCL class that allows us to access the underlying socket object.
+                        client.SendTo(writer.Data.Array, writer.Data.Offset, writer.Data.Count, SocketFlags.None, server);
                     }
 
-                    Enqueue(server.AddressFamily, udpClient);
+                    int readSize = udpClient.Available > MaxSize ? udpClient.Available : MaxSize;
 
-                    return response;
-                }
-            }
-            catch
-            {
-                mustDispose = true;
-                throw;
-            }
-            finally
-            {
-                if (!_enableClientQueue || mustDispose)
-                {
-                    try
+                    using (var memory = new PooledBytes(readSize))
                     {
-#if !NET45
-                        udpClient.Dispose();
-#else
-                        udpClient.Close();
-#endif
+                        int received = client.Receive(memory.Buffer, 0, readSize, SocketFlags.None);
+
+                        DnsResponseMessage response = GetResponseMessage(new ArraySegment<byte>(memory.Buffer, 0, received));
+                        if (request.Header.Id != response.Header.Id)
+                        {
+                            throw new DnsResponseException("Header id mismatch.");
+                        }
+
+                        Enqueue(server.AddressFamily, udpClient);
+                        return response;
                     }
-                    catch { }
+                }
+                catch
+                {
+                    mustDispose = true;
+                    throw;
+                }
+                finally
+                {
+                    if (!_enableClientQueue || mustDispose)
+                    {
+                        try
+                        {
+                            udpClient.Close();
+                        }
+                        catch
+                        {
+                        }
+                    }
                 }
             }
         }
@@ -90,7 +89,7 @@ namespace DnsClient
             IPEndPoint endpoint,
             DnsRequestMessage request,
             CancellationToken cancellationToken,
-            Action<Action> cancelationCallback)
+            Action<Action> cancellationCallback)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -99,14 +98,10 @@ namespace DnsClient
             bool mustDispose = false;
             try
             {
-                // setup timeout cancelation, dispose socket (the only way to acutally cancel the request in async...
-                cancelationCallback(() =>
+                // setup timeout cancellation, dispose socket (the only way to actually cancel the request in async...
+                cancellationCallback(() =>
                 {
-#if !NET45
-                    udpClient.Dispose();
-#else
                     udpClient.Close();
-#endif
                 });
 
                 using (var writer = new DnsDatagramWriter())
@@ -119,16 +114,8 @@ namespace DnsClient
 
                 using (var memory = new PooledBytes(readSize))
                 {
-#if !NET45
-                    int received = await udpClient.Client.ReceiveAsync(new ArraySegment<byte>(memory.Buffer), SocketFlags.None).ConfigureAwait(false);
-
-                    var response = GetResponseMessage(new ArraySegment<byte>(memory.Buffer, 0, received));
-
-#else
                     var result = await udpClient.ReceiveAsync().ConfigureAwait(false);
-
                     var response = GetResponseMessage(new ArraySegment<byte>(result.Buffer, 0, result.Buffer.Length));
-#endif
                     if (request.Header.Id != response.Header.Id)
                     {
                         throw new DnsResponseException("Header id mismatch.");
@@ -147,7 +134,6 @@ namespace DnsClient
             catch
             {
                 mustDispose = true;
-
                 throw;
             }
             finally
@@ -156,31 +142,30 @@ namespace DnsClient
                 {
                     try
                     {
-#if !NET45
-                        udpClient.Dispose();
-#else
                         udpClient.Close();
-#endif
                     }
                     catch { }
                 }
             }
         }
 
+        /// <summary>
+        /// Gets the UdpClient object - thread safe - using given address family e.g. IP v4.
+        /// </summary>
+        /// <param name="family"></param>
+        /// <returns></returns>
         private UdpClient GetNextUdpClient(AddressFamily family)
         {
             UdpClient udpClient = null;
             if (_enableClientQueue)
             {
                 while (udpClient == null && !TryDequeue(family, out udpClient))
-                {
-                    ////Interlocked.Increment(ref StaticLog.CreatedClients);
+                { 
                     udpClient = new UdpClient(family);
                 }
             }
             else
             {
-                ////Interlocked.Increment(ref StaticLog.CreatedClients);
                 udpClient = new UdpClient(family);
             }
 

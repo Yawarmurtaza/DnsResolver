@@ -1,10 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 using DnsClient;
 using DnsClient.Protocol;
 
@@ -33,7 +30,7 @@ namespace DnsResolver.ConsoleRunner
         {
             string dn = "microsoft.com";
             string ipaddress = "192.168.1.7";
-            // string dn = "someone.sometwo.iman.yawar";
+           
             Console.WriteLine($"Domain name: defaults to {dn}");
 
             string domainName = Console.ReadLine();
@@ -71,7 +68,7 @@ namespace DnsResolver.ConsoleRunner
             foreach (DnsResourceRecord nextRec in response.AllRecords)
             {
                 ARecord rec = nextRec as ARecord;
-                Console.WriteLine($"{nextRec.DomainName}\t\t{nextRec.RecordType}\t\t{nextRec.RecordClass}\t\t{nextRec.TimeToLive}\t\t{rec?.Address}");
+                Console.WriteLine($"{nextRec.DomainName.Value.TrimEnd('.')}\t\t{nextRec.RecordType}\t\t{nextRec.RecordClass}\t\t{nextRec.TimeToLive}\t\t{rec?.Address}");
             }
         }
     }
