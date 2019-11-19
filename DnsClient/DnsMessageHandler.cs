@@ -17,7 +17,7 @@ namespace DnsClient
 
         public virtual void GetRequestData(DnsRequestMessage request, DnsDatagramWriter writer)
         {
-            var question = request.Question;
+            DnsQuestion question = request.Question;
 
             /*
                                                 1  1  1  1  1  1

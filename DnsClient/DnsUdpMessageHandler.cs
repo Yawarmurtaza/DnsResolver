@@ -42,6 +42,8 @@ namespace DnsClient
                 using (var writer = new DnsDatagramWriter())
                 {
                     GetRequestData(request, writer);
+
+                    // udpClient is a .net FCL class that allows us to access the underlying socket object.
                     udpClient.Client.SendTo(writer.Data.Array, writer.Data.Offset, writer.Data.Count, SocketFlags.None, server);
                 }
 

@@ -208,21 +208,6 @@ namespace DnsClient
                 exceptions.Add(ex);
             }
 
-#if !NET45
-            if (exceptions.Count > 0)
-            {
-                try
-                {
-                    endPoints = ResolveNameServersNative();
-                    exceptions.Clear();
-                }
-                catch (Exception ex)
-                {
-                    exceptions.Add(ex);
-                }
-            }
-#endif
-
             if (exceptions.Count > 0)
             {
                 if (exceptions.Count > 1)
@@ -249,54 +234,31 @@ namespace DnsClient
             return endPoints;
         }
 
-#if !NET45
-
-        /// <summary>
-        /// Using my custom native implementation to support UWP apps and such until <see cref="NetworkInterface.GetAllNetworkInterfaces"/>
-        /// gets an implementation in netstandard2.1.
-        /// </summary>
-        /// <remarks>
-        /// DnsClient has been changed in version 1.1.0.
-        /// It will not invoke this when resolving default DNS servers. It is up to the user to decide what to do based on what platform the code is running on.
-        /// </remarks>
-        /// <returns>
-        /// The list of name servers.
-        /// </returns>
-        public static IReadOnlyCollection<NameServer> ResolveNameServersNative()
-        {
-            IPAddress[] addresses = null;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                var fixedInfo = Windows.IpHlpApi.FixedNetworkInformation.GetFixedInformation();
-
-                addresses = fixedInfo.DnsAddresses.ToArray();
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                addresses = Linux.StringParsingHelpers.ParseDnsAddressesFromResolvConfFile(EtcResolvConfFile).ToArray();
-            }
-
-            return addresses?.Select(p => new NameServer(p, DefaultPort)).ToArray();
-        }
-
-#endif
-
         private static NameServer[] QueryNetworkInterfaces(bool skipIPv6SiteLocal)
         {
-            var result = new HashSet<NameServer>();
+            // because we need distinct name servers thats why using Hashset type of collection of name server object.
+            HashSet<NameServer> result = new HashSet<NameServer>();
 
-            var adapters = NetworkInterface.GetAllNetworkInterfaces();
-            foreach (NetworkInterface networkInterface in
-                adapters
-                    .Where(p => p.OperationalStatus == OperationalStatus.Up
-                    && p.NetworkInterfaceType != NetworkInterfaceType.Loopback))
+            // step 1: Get all network adapters installed on this system...
+            NetworkInterface[] adapters = NetworkInterface.GetAllNetworkInterfaces();
+
+            // Step 2: Use the network adapters to get the active network interfaces except the loopback one because are not interested in 
+            // getting the loopback interface since there is no data sent on wire using this interface.
+            IEnumerable<NetworkInterface> interfaces 
+                = adapters.Where(p => p.OperationalStatus == OperationalStatus.Up 
+                                      && p.NetworkInterfaceType != NetworkInterfaceType.Loopback);
+            // Step 3: Loop though each network interface found 
+            foreach (NetworkInterface nextInterface in interfaces)
             {
-                foreach (IPAddress dnsAddress in networkInterface
-                    .GetIPProperties()
-                    .DnsAddresses
-                    .Where(i =>
-                        i.AddressFamily == AddressFamily.InterNetwork
-                        || i.AddressFamily == AddressFamily.InterNetworkV6))
+                // Step 4: Get the properties of this interface.
+                IPInterfaceProperties interfaceProperties = nextInterface.GetIPProperties();
+
+                // Step 5: Get the Domain Name Server for this interface 
+                IEnumerable<IPAddress> dnsAddresses = interfaceProperties.DnsAddresses
+                    .Where(i => i.AddressFamily == AddressFamily.InterNetwork || i.AddressFamily == AddressFamily.InterNetworkV6);
+                
+                // Step 6: Loop through each dns address of this interface to check if IP v6 is available and that we are interested in IP v6?
+                foreach (IPAddress dnsAddress in dnsAddresses)
                 {
                     if (dnsAddress.AddressFamily == AddressFamily.InterNetworkV6)
                     {
@@ -306,7 +268,19 @@ namespace DnsClient
                         }
                     }
 
-                    result.Add(new IPEndPoint(dnsAddress, DefaultPort));
+                    // add the DNS address assigned to this interface. This is the default gateway address when default windows settings 
+                    // are used.
+                    /*
+                     * --- When used the DHCP, the ipconfig command return this:
+                     * IPv4 Address. . . . . . . . . . . : 192.168.1.7
+                     * Subnet Mask . . . . . . . . . . . : 255.255.255.0
+                     * Default Gateway . . . . . . . . . : 192.168.1.1 <<-- this is our DNS server IP Address as well as the default gateway!!
+                     *
+                     * The default gateway and DNS Server IP addresses can be different.
+                     */
+
+
+                    result.Add(new IPEndPoint(dnsAddress, DefaultPort)); // the default port is 53 for DNS server.
                 }
             }
 

@@ -1,11 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DnsClient.Protocol.Options;
@@ -260,41 +257,6 @@ namespace DnsClient
         /// </example>
         public LookupClient(IPAddress address, int port)
            : this(new LookupClientOptions(new[] { new NameServer(address, port) }))
-        {
-        }
-
-        /// <summary>
-        /// Creates a new instance of <see cref="LookupClient"/> with default settings and the given name servers.
-        /// </summary>
-        /// <param name="nameServers">The <see cref="IPEndPoint"/>(s) to be used by this <see cref="LookupClient"/> instance.</param>
-        /// <example>
-        /// Connecting to one specific DNS server which does not run on the default port <c>53</c>:
-        /// <code>
-        /// <![CDATA[
-        /// var endpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8600);
-        /// var client = new LookupClient(endpoint);
-        /// ]]>
-        /// </code>
-        /// <para>
-        /// The <see cref="NameServer"/> class also contains pre defined <see cref="IPEndPoint"/>s for the public google DNS servers, which can be used as follows:
-        /// <code>
-        /// <![CDATA[
-        /// var client = new LookupClient(NameServer.GooglePublicDns, NameServer.GooglePublicDnsIPv6);
-        /// ]]>
-        /// </code>
-        /// </para>
-        /// </example>
-        public LookupClient(params IPEndPoint[] nameServers)
-            : this(new LookupClientOptions(nameServers))
-        {
-        }
-
-        /// <summary>
-        /// Creates a new instance of <see cref="LookupClient"/> with default settings and the given name servers.
-        /// </summary>
-        /// <param name="nameServers">The <see cref="NameServer"/>(s) to be used by this <see cref="LookupClient"/> instance.</param>
-        public LookupClient(params NameServer[] nameServers)
-            : this(new LookupClientOptions(nameServers))
         {
         }
 
@@ -635,11 +597,11 @@ namespace DnsClient
                 throw new ArgumentNullException(nameof(question));
             }
 
-            var head = new DnsRequestHeader(GetNextUniqueId(), settings.Recursion, DnsOpCode.Query);
-            var request = new DnsRequestMessage(head, question);
-            var handler = settings.UseTcpOnly ? _tcpFallbackHandler : _messageHandler;
+            DnsRequestHeader head = new DnsRequestHeader(GetNextUniqueId(), settings.Recursion, DnsOpCode.Query);
+            DnsRequestMessage request = new DnsRequestMessage(head, question);
+            DnsMessageHandler handler = settings.UseTcpOnly ? _tcpFallbackHandler : _messageHandler;
 
-            var servers = useServers ?? settings.ShuffleNameServers();
+            IReadOnlyCollection<NameServer> servers = useServers ?? settings.ShuffleNameServers();
 
             if (servers.Count == 0)
             {
@@ -1154,220 +1116,6 @@ namespace DnsClient
             }
 
             return unchecked((ushort)Interlocked.Increment(ref _uniqueId));
-        }
-    }
-
-    internal class LookupClientAudit
-    {
-        private const string c_placeHolder = "$$REPLACEME$$";
-        private static readonly int s_printOffset = -32;
-        private StringBuilder _auditWriter = new StringBuilder();
-        private Stopwatch _swatch;
-
-        public DnsQuerySettings Settings { get; }
-
-        public LookupClientAudit(DnsQuerySettings settings)
-        {
-            Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        }
-
-        public void StartTimer()
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return;
-            }
-
-            _swatch = Stopwatch.StartNew();
-            _swatch.Restart();
-        }
-
-        public void AuditResolveServers(int count)
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return;
-            }
-
-            _auditWriter.AppendLine($"; ({count} server found)");
-        }
-
-        public string Build(IDnsQueryResponse queryResponse)
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return string.Empty;
-            }
-
-            var writer = new StringBuilder();
-
-            if (queryResponse != null)
-            {
-                if (queryResponse.Questions.Count > 0)
-                {
-                    writer.AppendLine(";; QUESTION SECTION:");
-                    foreach (var question in queryResponse.Questions)
-                    {
-                        writer.AppendLine(question.ToString(s_printOffset));
-                    }
-                    writer.AppendLine();
-                }
-
-                if (queryResponse.Answers.Count > 0)
-                {
-                    writer.AppendLine(";; ANSWER SECTION:");
-                    foreach (var answer in queryResponse.Answers)
-                    {
-                        writer.AppendLine(answer.ToString(s_printOffset));
-                    }
-                    writer.AppendLine();
-                }
-
-                if (queryResponse.Authorities.Count > 0)
-                {
-                    writer.AppendLine(";; AUTHORITIES SECTION:");
-                    foreach (var auth in queryResponse.Authorities)
-                    {
-                        writer.AppendLine(auth.ToString(s_printOffset));
-                    }
-                    writer.AppendLine();
-                }
-
-                if (queryResponse.Additionals.Count > 0)
-                {
-                    writer.AppendLine(";; ADDITIONALS SECTION:");
-                    foreach (var additional in queryResponse.Additionals)
-                    {
-                        writer.AppendLine(additional.ToString(s_printOffset));
-                    }
-                    writer.AppendLine();
-                }
-            }
-
-            var all = _auditWriter.ToString();
-            var dynamic = writer.ToString();
-
-            return all.Replace(c_placeHolder, dynamic);
-        }
-
-        public void AuditTruncatedRetryTcp()
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return;
-            }
-
-            _auditWriter.AppendLine(";; Truncated, retrying in TCP mode.");
-            _auditWriter.AppendLine();
-        }
-
-        public void AuditResponseError(DnsResponseCode responseCode)
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return;
-            }
-
-            _auditWriter.AppendLine($";; ERROR: {DnsResponseCodeText.GetErrorText(responseCode)}");
-        }
-
-        public void AuditOptPseudo()
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return;
-            }
-
-            _auditWriter.AppendLine(";; OPT PSEUDOSECTION:");
-        }
-
-        public void AuditResponseHeader(DnsResponseHeader header)
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return;
-            }
-
-            _auditWriter.AppendLine(";; Got answer:");
-            _auditWriter.AppendLine(header.ToString());
-            if (header.RecursionDesired && !header.RecursionAvailable)
-            {
-                _auditWriter.AppendLine(";; WARNING: recursion requested but not available");
-            }
-            _auditWriter.AppendLine();
-        }
-
-        public void AuditEdnsOpt(short udpSize, byte version, DnsResponseCode responseCodeEx)
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return;
-            }
-
-            // TODO: flags
-            _auditWriter.AppendLine($"; EDNS: version: {version}, flags:; udp: {udpSize}");
-        }
-
-        public void AuditResponse()
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return;
-            }
-
-            _auditWriter.AppendLine(c_placeHolder);
-        }
-
-        public void AuditEnd(DnsQueryResponse queryResponse)
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return;
-            }
-
-            var elapsed = _swatch.ElapsedMilliseconds;
-            _auditWriter.AppendLine($";; Query time: {elapsed} msec");
-            _auditWriter.AppendLine($";; SERVER: {queryResponse.NameServer.Address}#{queryResponse.NameServer.Port}");
-            _auditWriter.AppendLine($";; WHEN: {DateTime.UtcNow.ToString("ddd MMM dd HH:mm:ss K yyyy", CultureInfo.InvariantCulture)}");
-            _auditWriter.AppendLine($";; MSG SIZE  rcvd: {queryResponse.MessageSize}");
-        }
-
-        public void AuditException(Exception ex)
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return;
-            }
-
-            var aggEx = ex as AggregateException;
-            if (ex is DnsResponseException dnsEx)
-            {
-                _auditWriter.AppendLine($";; Error: {DnsResponseCodeText.GetErrorText(dnsEx.Code)} {dnsEx.InnerException?.Message ?? dnsEx.Message}");
-            }
-            else if (aggEx != null)
-            {
-                _auditWriter.AppendLine($";; Error: {aggEx.InnerException?.Message ?? aggEx.Message}");
-            }
-            else
-            {
-                _auditWriter.AppendLine($";; Error: {ex.Message}");
-            }
-
-            if (Debugger.IsAttached)
-            {
-                _auditWriter.AppendLine(ex.ToString());
-            }
-        }
-
-        public void AuditRetryNextServer(NameServer current)
-        {
-            if (!Settings.EnableAuditTrail)
-            {
-                return;
-            }
-
-            _auditWriter.AppendLine();
-            _auditWriter.AppendLine($"; SERVER: {current.Address}#{current.Port} failed; Retrying with the next server.");
         }
     }
 }
