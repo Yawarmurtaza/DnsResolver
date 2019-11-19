@@ -210,10 +210,9 @@ namespace DnsClient
             }
         }
 
-        internal DnsQuerySettings WithServers(
-            IReadOnlyCollection<NameServer> nameServers)
+        internal DnsQuerySettings WithServers(IEnumerable<NameServer> nameServers)
         {
-            return new DnsQuerySettings(new DnsQueryOptions(nameServers)
+            return new DnsQuerySettings(new DnsQueryOptions(nameServers.ToArray())
             {
                 ContinueOnDnsError = ContinueOnDnsError,
                 EnableAuditTrail = EnableAuditTrail,

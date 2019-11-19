@@ -42,6 +42,14 @@ namespace DnsClient
         internal const string EtcResolvConfFile = "/etc/resolv.conf";
 
         /// <summary>
+        /// Creates NameServer instance.
+        /// </summary>
+        public NameServer()
+        {
+            
+        }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="NameServer"/> class.
         /// </summary>
         /// <param name="endPoint">The name server endpoint.</param>
@@ -193,9 +201,9 @@ namespace DnsClient
         /// <returns>
         /// The list of name servers.
         /// </returns>
-        public static IReadOnlyCollection<NameServer> ResolveNameServers(bool skipIPv6SiteLocal = true, bool fallbackToGooglePublicDns = true)
+        public IEnumerable<NameServer> ResolveNameServers(bool skipIPv6SiteLocal = true, bool fallbackToGooglePublicDns = true)
         {
-            IReadOnlyCollection<NameServer> endPoints = new NameServer[0];
+            IEnumerable<NameServer> endPoints = null;
 
             List<Exception> exceptions = new List<Exception>();
 
@@ -220,7 +228,7 @@ namespace DnsClient
                 }
             }
 
-            if (endPoints.Count == 0 && fallbackToGooglePublicDns)
+            if (endPoints == null && fallbackToGooglePublicDns)
             {
                 return new NameServer[]
                 {
@@ -234,7 +242,12 @@ namespace DnsClient
             return endPoints;
         }
 
-        private static NameServer[] QueryNetworkInterfaces(bool skipIPv6SiteLocal)
+        /// <summary>
+        /// Finds the local network interface cards, filters those that are active and non-loopback then gets the DNS address on each NIC.
+        /// </summary>
+        /// <param name="skipIPv6SiteLocal">Switch to allow IP v6.</param>
+        /// <returns>Name server collection.</returns>
+        private IEnumerable<NameServer> QueryNetworkInterfaces(bool skipIPv6SiteLocal)
         {
             // because we need distinct name servers thats why using Hashset type of collection of name server object.
             HashSet<NameServer> result = new HashSet<NameServer>();
@@ -284,7 +297,7 @@ namespace DnsClient
                 }
             }
 
-            return result.ToArray();
+            return result;
         }
     }
 }

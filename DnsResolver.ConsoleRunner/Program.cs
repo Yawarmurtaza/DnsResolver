@@ -13,41 +13,12 @@ namespace DnsResolver.ConsoleRunner
     class Program
     {
         static void Main(string[] args)
-            {
-            
+        { 
             try
             {
-                string dn = "microsoft.com";
-                string ipaddress = "172.17.131.1";
-                // string dn = "someone.sometwo.iman.yawar";
-                Console.WriteLine($"Domain name: defaults to {dn}");
-                Console.WriteLine($"Domain name: defaults to {dn}");
-                string domainName = Console.ReadLine();
-                if (string.IsNullOrEmpty(domainName))
-                {
-                    domainName = dn;
-                }
-
-                Console.WriteLine("DSE Server IP Address: ");
-                string dseServerIpAddress = Console.ReadLine();
-                if (string.IsNullOrEmpty(dseServerIpAddress))
-                {
-                    dseServerIpAddress = ipaddress;
-                }
-
-                ILookupClient client = new LookupClient();
-
-                IReadOnlyCollection<NameServer> servers = new List<NameServer>()
-                {
-                    new NameServer(IPAddress.Parse(dseServerIpAddress.Trim()))
-                };
-
-                IDnsQueryResponse response = client.QueryServer(servers, domainName.Trim(), QueryType.A);
-                foreach (DnsResourceRecord nextRec in response.AllRecords)
-                {
-                    Console.WriteLine(nextRec);
-                }
-
+                Tuple<string,string> userInput = GetUserInput();
+                IDnsQueryResponse response = Query(userInput.Item1, userInput.Item2);
+                PrintResult(response);
             }
             catch (Exception ex)
             {
@@ -56,15 +27,52 @@ namespace DnsResolver.ConsoleRunner
 
             Console.WriteLine("Press any key to exit");
             Console.ReadKey();
+        }
 
-            //Name n = "yawar";
-            //var ame = n.FirstName;
+        private static Tuple<string, string> GetUserInput()
+        {
+            string dn = "microsoft.com";
+            string ipaddress = "192.168.1.7";
+            // string dn = "someone.sometwo.iman.yawar";
+            Console.WriteLine($"Domain name: defaults to {dn}");
 
-            //Currency cur = 99;
-            //Currency cur1 = "PKR";
-            //Currency cur2 = 99.12m;
-            //string symbol = cur2;
-            //decimal d = cur2;
+            string domainName = Console.ReadLine();
+            if (string.IsNullOrEmpty(domainName))
+            {
+                domainName = dn;
+            }
+
+            Console.WriteLine("DSE Server IP Address: ");
+            string dseServerIpAddress = Console.ReadLine();
+            if (string.IsNullOrEmpty(dseServerIpAddress))
+            {
+                dseServerIpAddress = ipaddress;
+            }
+
+            return new Tuple<string, string>(domainName, dseServerIpAddress);
+        }
+
+        private static IDnsQueryResponse Query(string domainName, string dseServerIpAddress)
+        {
+            Console.WriteLine($"Trying to resolve [{domainName}] on [{dseServerIpAddress}] server...");
+
+            ILookupClient client = new LookupClient();
+            IReadOnlyCollection<NameServer> servers = new List<NameServer>()
+            {
+                new NameServer(IPAddress.Parse(dseServerIpAddress.Trim()))
+            };
+
+            return client.QueryServer(servers, domainName.Trim(), QueryType.A);
+        }
+        private static void PrintResult(IDnsQueryResponse response)
+        {
+            Console.WriteLine("\nDomain Name\t\tRecord Type\tRecord Class\tTime to live\tIP Address");
+            Console.WriteLine("--------------------------------------------------------------------------------------------|");
+            foreach (DnsResourceRecord nextRec in response.AllRecords)
+            {
+                ARecord rec = nextRec as ARecord;
+                Console.WriteLine($"{nextRec.DomainName}\t\t{nextRec.RecordType}\t\t{nextRec.RecordClass}\t\t{nextRec.TimeToLive}\t\t{rec?.Address}");
+            }
         }
     }
 

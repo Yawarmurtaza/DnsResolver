@@ -395,7 +395,7 @@ namespace DnsClient
             }
 
             DnsQuerySettings settings;
-            if (queryOptions.NameServers.Count == 0 && queryOptions.AutoResolvedNameServers == false)
+            if (queryOptions.NameServers.Any() && queryOptions.AutoResolvedNameServers == false)
             {
                 // fallback to already configured nameservers in case none are specified.
                 settings = new DnsQuerySettings(queryOptions, Settings.NameServers);
@@ -469,7 +469,7 @@ namespace DnsClient
             }
 
             DnsQuerySettings settings;
-            if (queryOptions.NameServers.Count == 0 && queryOptions.AutoResolvedNameServers == false)
+            if (queryOptions.NameServers.Any() && queryOptions.AutoResolvedNameServers == false)
             {
                 // fallback to already configured nameservers in case none are specified.
                 settings = new DnsQuerySettings(queryOptions, Settings.NameServers);

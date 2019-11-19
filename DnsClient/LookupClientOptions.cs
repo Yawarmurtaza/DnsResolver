@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading;
 
@@ -22,15 +23,6 @@ namespace DnsClient
         /// </summary>
         public LookupClientOptions(bool resolveNameServers = true)
             : base(resolveNameServers)
-        {
-        }
-
-        /// <summary>
-        /// Creates a new instance of <see cref="LookupClientOptions"/> with one name server.
-        /// <see cref="IPAddress"/> or <see cref="IPEndPoint"/> can be used as well thanks to implicit conversion.
-        /// </summary>
-        /// <param name="nameServer">The name servers.</param>
-        public LookupClientOptions(NameServer nameServer) : base(nameServer)
         {
         }
 
@@ -63,7 +55,7 @@ namespace DnsClient
         /// Creates a new instance of <see cref="LookupClientOptions"/>.
         /// </summary>
         /// <param name="nameServers">A collection of name servers.</param>
-        public LookupClientOptions(IReadOnlyCollection<NameServer> nameServers) : base(nameServers)
+        public LookupClientOptions(IEnumerable<NameServer> nameServers) : base(nameServers.ToArray())
         {
         }
 

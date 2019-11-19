@@ -24,8 +24,7 @@ namespace DnsClient
         /// </remarks>
         /// <param name="resolveNameServers">If set to <c>true</c>, <see cref="NameServer.ResolveNameServers(bool, bool)"/>
         /// will be used to get a list of nameservers.</param>
-        public DnsQueryOptions(bool resolveNameServers = false)
-            : this(resolveNameServers ? NameServer.ResolveNameServers(fallbackToGooglePublicDns:false) : null)
+        public DnsQueryOptions(bool resolveNameServers = false) : this()
         {
             AutoResolvedNameServers = resolveNameServers;
         }
@@ -43,12 +42,9 @@ namespace DnsClient
         /// Creates a new instance of <see cref="DnsQueryOptions"/>.
         /// </summary>
         /// <param name="nameServers">A collection of name servers.</param>
-        public DnsQueryOptions(IReadOnlyCollection<NameServer> nameServers)
+        public DnsQueryOptions()
         {
-            if (nameServers != null && nameServers.Count > 0)
-            {
-                NameServers = nameServers.ToList();
-            }
+            NameServers = new NameServer().ResolveNameServers();
         }
 
         /// <summary>
@@ -67,8 +63,7 @@ namespace DnsClient
         /// Creates a new instance of <see cref="DnsQueryOptions"/>.
         /// </summary>
         /// <param name="nameServers">A collection of name servers.</param>
-        public DnsQueryOptions(params IPEndPoint[] nameServers)
-            : this(nameServers.Select(p => (NameServer)p).ToArray())
+        public DnsQueryOptions(params IPEndPoint[] nameServers) : this(nameServers.Select(p => (NameServer)p).ToArray())
         {
         }
 
@@ -105,7 +100,7 @@ namespace DnsClient
         /// <summary>
         /// Gets or sets a list of name servers which should be used to query.
         /// </summary>
-        public IList<NameServer> NameServers { get; set; } = new List<NameServer>();
+        public IEnumerable<NameServer> NameServers { get; set; }
 
         /// <summary>
         /// Gets or sets a flag indicating whether DNS queries should instruct the DNS server to do recursive lookups, or not.
