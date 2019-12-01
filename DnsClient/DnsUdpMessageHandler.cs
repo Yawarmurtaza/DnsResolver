@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DnsClient.Internal;
@@ -12,8 +13,8 @@ namespace DnsClient
     internal class DnsUdpMessageHandler : DnsMessageHandler
     {
         private const int MaxSize = 4096;
-        private static ConcurrentQueue<UdpClient> _clients = new ConcurrentQueue<UdpClient>();
-        private static ConcurrentQueue<UdpClient> _clientsIPv6 = new ConcurrentQueue<UdpClient>();
+        private static readonly ConcurrentQueue<UdpClient> _clients = new ConcurrentQueue<UdpClient>();
+        private static readonly ConcurrentQueue<UdpClient> _clientsIPv6 = new ConcurrentQueue<UdpClient>();
         private readonly bool _enableClientQueue;
 
         public DnsUdpMessageHandler(bool enableClientQueue)
@@ -42,7 +43,12 @@ namespace DnsClient
                 {
                     using (var writer = new DnsDatagramWriter())
                     {
-                        GetRequestData(request, writer);
+                        base.GetRequestData(request, writer);
+                        //string s1 = Encoding.UTF32.GetString(writer.Data.Array);
+                        //string s = Encoding.UTF8.GetString(writer.Data.Array);
+                        //string stringData = Encoding.Default.GetString(writer.Data.Array);
+
+                        string requestData = Encoding.ASCII.GetString(writer.Data.Array,0,writer.Data.Count);
 
                         // udpClient is a .net FCL class that allows us to access the underlying socket object.
                         client.SendTo(writer.Data.Array, writer.Data.Offset, writer.Data.Count, SocketFlags.None, server);
@@ -54,7 +60,7 @@ namespace DnsClient
                     {
                         int received = client.Receive(memory.Buffer, 0, readSize, SocketFlags.None);
 
-                        DnsResponseMessage response = GetResponseMessage(new ArraySegment<byte>(memory.Buffer, 0, received));
+                        DnsResponseMessage response = base.GetResponseMessage(new ArraySegment<byte>(memory.Buffer, 0, received));
                         if (request.Header.Id != response.Header.Id)
                         {
                             throw new DnsResponseException("Header id mismatch.");
@@ -85,66 +91,64 @@ namespace DnsClient
             }
         }
 
-        public override async Task<DnsResponseMessage> QueryAsync(
-            IPEndPoint endpoint,
-            DnsRequestMessage request,
-            CancellationToken cancellationToken,
-            Action<Action> cancellationCallback)
+        public override async Task<DnsResponseMessage> QueryAsync(IPEndPoint endpoint, DnsRequestMessage request, CancellationToken cancellationToken, Action<Action> cancellationCallback)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            UdpClient udpClient = GetNextUdpClient(endpoint.AddressFamily);
-
-            bool mustDispose = false;
-            try
+            using (UdpClient udpClient = GetNextUdpClient(endpoint.AddressFamily))
             {
-                // setup timeout cancellation, dispose socket (the only way to actually cancel the request in async...
-                cancellationCallback(() =>
-                {
-                    udpClient.Close();
-                });
 
-                using (var writer = new DnsDatagramWriter())
+                bool mustDispose = false;
+                try
                 {
-                    GetRequestData(request, writer);
-                    await udpClient.SendAsync(writer.Data.Array, writer.Data.Count, endpoint).ConfigureAwait(false);
-                }
+                    // setup timeout cancellation, dispose socket (the only way to actually cancel the request in async...
+                    cancellationCallback(() => { udpClient.Close(); });
 
-                var readSize = udpClient.Available > MaxSize ? udpClient.Available : MaxSize;
-
-                using (var memory = new PooledBytes(readSize))
-                {
-                    var result = await udpClient.ReceiveAsync().ConfigureAwait(false);
-                    var response = GetResponseMessage(new ArraySegment<byte>(result.Buffer, 0, result.Buffer.Length));
-                    if (request.Header.Id != response.Header.Id)
+                    using (var writer = new DnsDatagramWriter())
                     {
-                        throw new DnsResponseException("Header id mismatch.");
+                        GetRequestData(request, writer);
+                        await udpClient.SendAsync(writer.Data.Array, writer.Data.Count, endpoint).ConfigureAwait(false);
                     }
 
-                    Enqueue(endpoint.AddressFamily, udpClient);
+                    var readSize = udpClient.Available > MaxSize ? udpClient.Available : MaxSize;
 
-                    return response;
-                }
-            }
-            catch (ObjectDisposedException)
-            {
-                // we disposed it in case of a timeout request, lets indicate it actually timed out...
-                throw new TimeoutException();
-            }
-            catch
-            {
-                mustDispose = true;
-                throw;
-            }
-            finally
-            {
-                if (!_enableClientQueue || mustDispose)
-                {
-                    try
+                    using (var memory = new PooledBytes(readSize))
                     {
-                        udpClient.Close();
+                        var result = await udpClient.ReceiveAsync().ConfigureAwait(false);
+                        var response =
+                            GetResponseMessage(new ArraySegment<byte>(result.Buffer, 0, result.Buffer.Length));
+                        if (request.Header.Id != response.Header.Id)
+                        {
+                            throw new DnsResponseException("Header id mismatch.");
+                        }
+
+                        Enqueue(endpoint.AddressFamily, udpClient);
+
+                        return response;
                     }
-                    catch { }
+                }
+                catch (ObjectDisposedException)
+                {
+                    // we disposed it in case of a timeout request, lets indicate it actually timed out...
+                    throw new TimeoutException();
+                }
+                catch
+                {
+                    mustDispose = true;
+                    throw;
+                }
+                finally
+                {
+                    if (!_enableClientQueue || mustDispose)
+                    {
+                        try
+                        {
+                            udpClient.Close();
+                        }
+                        catch
+                        {
+                        }
+                    }
                 }
             }
         }

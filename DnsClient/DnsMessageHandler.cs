@@ -2,10 +2,14 @@
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using DnsClient.Protocol;
 using DnsClient.Protocol.Options;
 
 namespace DnsClient
 {
+    /// <summary>
+    /// Generic DNS message handler that handles the messages to and from remote computer. It contains common methods & properties for Udp and TCP message handlers.
+    /// </summary>
     internal abstract class DnsMessageHandler
     {
         public abstract DnsResponseMessage Query(IPEndPoint endpoint, DnsRequestMessage request, TimeSpan timeout);
@@ -43,7 +47,7 @@ namespace DnsClient
             writer.WriteInt16NetworkOrder(1);   // we support single question only... (as most DNS servers anyways).
             writer.WriteInt16NetworkOrder(0);
             writer.WriteInt16NetworkOrder(0);
-            writer.WriteInt16NetworkOrder(1); // one additional for the Opt record.
+            writer.WriteInt16NetworkOrder(1);    // one additional for the Opt record.
 
             writer.WriteHostName(question.QueryName);
             writer.WriteUInt16NetworkOrder((ushort)question.QuestionType);
@@ -76,12 +80,12 @@ namespace DnsClient
             var reader = new DnsDatagramReader(responseData);
             var factory = new DnsRecordFactory(reader);
 
-            var id = reader.ReadUInt16NetworkOrder();
-            var flags = reader.ReadUInt16NetworkOrder();
-            var questionCount = reader.ReadUInt16NetworkOrder();
-            var answerCount = reader.ReadUInt16NetworkOrder();
-            var nameServerCount = reader.ReadUInt16NetworkOrder();
-            var additionalCount = reader.ReadUInt16NetworkOrder();
+            ushort id = reader.ReadUInt16NetworkOrder();
+            ushort flags = reader.ReadUInt16NetworkOrder();
+            ushort questionCount = reader.ReadUInt16NetworkOrder();
+            ushort answerCount = reader.ReadUInt16NetworkOrder();
+            ushort nameServerCount = reader.ReadUInt16NetworkOrder();
+            ushort additionalCount = reader.ReadUInt16NetworkOrder();
 
             var header = new DnsResponseHeader(id, flags, questionCount, answerCount, additionalCount, nameServerCount);
             var response = new DnsResponseMessage(header, responseData.Count);
@@ -94,22 +98,22 @@ namespace DnsClient
 
             for (int answerIndex = 0; answerIndex < answerCount; answerIndex++)
             {
-                var info = factory.ReadRecordInfo();
-                var record = factory.GetRecord(info);
+                ResourceRecordInfo info = factory.ReadRecordInfo();
+                DnsResourceRecord record = factory.GetRecord(info);
                 response.AddAnswer(record);
             }
 
             for (int serverIndex = 0; serverIndex < nameServerCount; serverIndex++)
             {
-                var info = factory.ReadRecordInfo();
-                var record = factory.GetRecord(info);
+                ResourceRecordInfo info = factory.ReadRecordInfo();
+                DnsResourceRecord record = factory.GetRecord(info);
                 response.AddAuthority(record);
             }
 
             for (int additionalIndex = 0; additionalIndex < additionalCount; additionalIndex++)
             {
-                var info = factory.ReadRecordInfo();
-                var record = factory.GetRecord(info);
+                ResourceRecordInfo info = factory.ReadRecordInfo();
+                DnsResourceRecord record = factory.GetRecord(info);
                 response.AddAdditional(record);
             }
 

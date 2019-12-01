@@ -11,49 +11,20 @@ namespace DnsClient
     /// </para>
     /// </summary>
     public interface ILookupClient : IDnsQuery
-    {
-        /// <summary>
-        /// Gets the list of configured default name servers.
-        /// </summary>
-        IReadOnlyCollection<NameServer> NameServers { get; }
-
-#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-
+    { 
         // all settings will be moved into DnsQueryOptions/LookupClientOptions
-        [Obsolete("This property will be removed from LookupClient in the next version. Use LookupClientOptions to initialize LookupClient instead.")]
-        TimeSpan? MinimumCacheTimeout { get; set; }
 
         [Obsolete("This property will be removed from LookupClient in the next version. Use LookupClientOptions to initialize LookupClient instead.")]
         bool EnableAuditTrail { get; set; }
 
         [Obsolete("This property will be removed from LookupClient in the next version. Use LookupClientOptions to initialize LookupClient instead.")]
-        bool UseCache { get; set; }
-
-        [Obsolete("This property will be removed from LookupClient in the next version. Use LookupClientOptions to initialize LookupClient instead.")]
-        bool Recursion { get; set; }
-
-        [Obsolete("This property will be removed from LookupClient in the next version. Use LookupClientOptions to initialize LookupClient instead.")]
-        int Retries { get; set; }
-
-        [Obsolete("This property will be removed from LookupClient in the next version. Use LookupClientOptions to initialize LookupClient instead.")]
         bool ThrowDnsErrors { get; set; }
-
-        [Obsolete("This property will be removed from LookupClient in the next version. Use LookupClientOptions to initialize LookupClient instead.")]
-        bool UseRandomNameServer { get; set; }
-
-        [Obsolete("This property will be removed from LookupClient in the next version. Use LookupClientOptions to initialize LookupClient instead.")]
-        bool ContinueOnDnsError { get; set; }
 
         [Obsolete("This property will be removed from LookupClient in the next version. Use LookupClientOptions to initialize LookupClient instead.")]
         TimeSpan Timeout { get; set; }
 
         [Obsolete("This property will be removed from LookupClient in the next version. Use LookupClientOptions to initialize LookupClient instead.")]
-        bool UseTcpFallback { get; set; }
-
-        [Obsolete("This property will be removed from LookupClient in the next version. Use LookupClientOptions to initialize LookupClient instead.")]
         bool UseTcpOnly { get; set; }
-
-#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
     }
 
     // TODO: revisit if we need this AND LookupClientSettings, might not be needed for per query options

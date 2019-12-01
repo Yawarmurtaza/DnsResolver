@@ -2,18 +2,32 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
+using System.Text;
 using DnsClient;
 using DnsClient.Protocol;
 
 namespace DnsResolver.ConsoleRunner
 {
+    public class DnsClass
+    {
+        public void Resolve()
+        {
+            string s = Encoding.UTF8.GetString(new byte []{65});
+            //byte[] b = Encoding.UTF8.GetBytes("A.");
+
+        }
+    }
+
+
+
     class Program
     {
         static void Main(string[] args)
-        { 
+        {
+            new DnsClass().Resolve();
             try
             {
-                Tuple<string,string> userInput = GetUserInput();
+                Tuple<string, string> userInput = GetUserInput();
                 IDnsQueryResponse response = Query(userInput.Item1, userInput.Item2);
                 PrintResult(response);
             }
@@ -29,7 +43,7 @@ namespace DnsResolver.ConsoleRunner
         private static Tuple<string, string> GetUserInput()
         {
             string dn = "microsoft.com";
-            string ipaddress = "192.168.1.7";
+            string ipaddress = "172.20.10.1";
            
             Console.WriteLine($"Domain name: defaults to {dn}");
 

@@ -31,6 +31,7 @@ namespace DnsClient
         public DnsDatagramWriter()
         {
             _pooledBytes = new PooledBytes(BufferSize);
+            // https://stackoverflow.com/questions/4600024/what-is-the-use-of-the-arraysegmentt-class
             _buffer = new ArraySegment<byte>(_pooledBytes.Buffer, 0, BufferSize);
         }
 
@@ -43,15 +44,15 @@ namespace DnsClient
 
         public void WriteHostName(string queryName)
         {
-            var bytes = Encoding.UTF8.GetBytes(queryName);
+            byte[] bytes = Encoding.UTF8.GetBytes(queryName);
             int lastOctet = 0;
-            var index = 0;
+            int index = 0;
             if (bytes.Length <= 1)
             {
                 WriteByte(0);
                 return;
             }
-            foreach (var b in bytes)
+            foreach (byte b in bytes)
             {
                 if (b == DotByte)
                 {
@@ -71,7 +72,10 @@ namespace DnsClient
             _buffer.Array[_buffer.Offset + Index++] = b;
         }
 
-        public void WriteBytes(byte[] data, int length) => WriteBytes(data, 0, length);
+        public void WriteBytes(byte[] data, int length)
+        {
+            WriteBytes(data, 0, length);
+        }
 
         public void WriteBytes(byte[] data, int dataOffset, int length)
         {
@@ -82,19 +86,25 @@ namespace DnsClient
 
         public void WriteInt16NetworkOrder(short value)
         {
-            var bytes = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(value));
+            byte[] bytes = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(value));
             WriteBytes(bytes, bytes.Length);
         }
 
         public void WriteInt32NetworkOrder(int value)
         {
-            var bytes = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(value));
+            byte[] bytes = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(value));
             WriteBytes(bytes, bytes.Length);
         }
 
-        public void WriteUInt16NetworkOrder(ushort value) => WriteInt16NetworkOrder((short)value);
+        public void WriteUInt16NetworkOrder(ushort value)
+        {
+            WriteInt16NetworkOrder((short) value);
+        }
 
-        public void WriteUInt32NetworkOrder(uint value) => WriteInt32NetworkOrder((int)value);
+        public void WriteUInt32NetworkOrder(uint value)
+        {
+            WriteInt32NetworkOrder((int) value);
+        }
 
         protected virtual void Dispose(bool disposing)
         {
